@@ -1,7 +1,11 @@
 import { parseType } from './parsers';
-import { Observer, IObserverSyncCallback } from './observer';
+import { Observer, IObserverSyncCallback, IObservers } from './observer';
 import { Binder, IOneWayBinder, ITwoWayBinder } from './binders';
 import { View } from './view';
+import { PRIMITIVE, KEYPATH, DEFAULT_PROPERTYNAME, IKeypaths, IPrimitives } from './attributes';
+
+const FORMATTER_ARGS =  /[^\s']+|'([^']|'[^\s])*'|"([^"]|"[^\s])*"/g;
+const FORMATTER_SPLIT = /\s+/;
 
 export interface IFormatterObservers {
   [key: string]: {
@@ -38,21 +42,10 @@ function getInputValue(el: HTMLSelectElement | HTMLInputElement) {
 }
 
 /**
- * Used also in parsers.parseType
- * TODO outsource
- */
-const PRIMITIVE = 0;
-const KEYPATH = 1;
-
-const FORMATTER_ARGS =  /[^\s']+|'([^']|'[^\s])*'|"([^"]|"[^\s])*"/g;
-const FORMATTER_SPLIT = /\s+/;
-
-/**
  *  A single binding between a model attribute and a DOM element.
  */
 export class Binding {
-  value?: any;
-  observer?: Observer;
+  observers: IObservers = {};
   view: View;
   el: HTMLElement;
   /**
@@ -62,7 +55,14 @@ export class Binding {
   binder: Binder<any> | null;
   formatters: string[] | null;
   formatterObservers: IFormatterObservers;
-  keypath: string | null;
+  /**
+   * statics values (PRIMITIVE Attributes)
+   */
+  primitives: IPrimitives = {};
+  /**
+   * keypath values (KEYPATH Attributes)
+   */
+  keypaths: IKeypaths = {};
   /**
    * Arguments parsed from star binders, e.g. on foo-*-* args[0] is the first star, args[1] the second-
    */
@@ -70,7 +70,7 @@ export class Binding {
   /**
    * 
    */
-  model?: any;
+  model: any = {};
   /**
    * HTML Comment to mark a binding in the DOM
    */
@@ -100,14 +100,20 @@ export class Binding {
     this.view = view;
     this.el = el;
     this.type = type;
-    this.keypath = keypath;
     this.binder = binder;
     this.args = args;
     this.formatters = formatters;
     this.formatterObservers = {};
-    this.model = undefined;
+    this.model[DEFAULT_PROPERTYNAME] = undefined;
     this.customData = {};
 
+    console.log('new binder', this.type);
+
+    if(keypath !== null) {
+      this.keypaths[DEFAULT_PROPERTYNAME] = keypath;
+    } else {
+      this.keypaths[DEFAULT_PROPERTYNAME] = 'FIXME';
+    }
   }
 
   /**
@@ -125,18 +131,23 @@ export class Binding {
   }
 
   parseTarget() {
-    if (this.keypath) {
-      let token = parseType(this.keypath);
-      if (token.type === PRIMITIVE) {
-        this.value = token.value;
-      } else if(token.type === KEYPATH){
-        this.observer = this.observe(this.view.models, this.keypath);
-        this.model = this.observer.target;
-      } else {
-        throw new Error('Unknown type in token');
+    for (const propertyName in this.keypaths) {
+      if (this.keypaths.hasOwnProperty(propertyName)) {
+        const keypath = this.keypaths[propertyName];
+        if(keypath) {
+          let token = parseType(keypath);
+          if (token.type === PRIMITIVE) {
+            this.primitives[propertyName] = token.value;
+          } else if(token.type === KEYPATH){
+            this.observers[propertyName] = this.observe(this.view.models, keypath);
+            this.model[propertyName] = this.observers[propertyName].target;
+          } else {
+            throw new Error('Unknown type in token');
+          }
+        } else {
+          this.primitives[propertyName] = undefined;
+        }
       }
-    } else {
-      this.value = undefined;
     }
   }
   
@@ -183,7 +194,8 @@ export class Binding {
    */
   formattedValue(value: any) {
     if(this.formatters === null) {
-      throw new Error('formatters is null');
+      // throw new Error('formatters is null');
+      return value;
     }
     return this.formatters.reduce((result: any/*check type*/, declaration: string /*check type*/, index: number) => {
       let args = declaration.match(FORMATTER_ARGS);
@@ -226,10 +238,10 @@ export class Binding {
    * Sets the value for the binding. This Basically just runs the binding routine
    * with the supplied value formatted.
    */
-  set(value: any) {
+  set(value: any, propertyName = DEFAULT_PROPERTYNAME) {
     if ((value instanceof Function) && !(this.binder as ITwoWayBinder<any> ).function) {
       value = (value as IOneWayBinder<any> )
-      value = this.formattedValue(value.call(this.model));
+      value = this.formattedValue(value.call(this.model[propertyName]));
     } else {
       value = (value as ITwoWayBinder<any> )
       value = this.formattedValue(value);
@@ -256,11 +268,18 @@ export class Binding {
    * Syncs up the view binding with the model.
    */
   sync() {
-    if (this.observer) {
-      this.model = this.observer.target;
-      this.set(this.observer.value());
-    } else {
-      this.set(this.value);
+    for (const propertyName in this.observers) {
+      if (this.observers.hasOwnProperty(propertyName)) {
+        const observer = this.observers[propertyName];
+
+        if(observer) {
+          this.model[propertyName] = observer.target;
+          this.set(observer.value(), propertyName);
+        } else {
+          const primitive = this.primitives[propertyName];
+          this.set(primitive, propertyName);
+        }
+      }
     }
   }
 
@@ -268,26 +287,32 @@ export class Binding {
    * Publishes the value currently set on the input element back to the model.
    */
   publish() {
-    if (this.observer) {
+    if (this.observers) {
       if(this.formatters === null) {
         throw new Error('formatters is null');
       }
-      let value = this.formatters.reduceRight((result: any/*check type*/, declaration: string /*check type*/, index: number) => {
-        const args = declaration.split(FORMATTER_SPLIT);
-        const id = args.shift();
-        if(!id) {
-          throw new Error('id not defined');
-        }
-        const formatter = this.view.options.formatters[id];
-        const processedArgs = this.parseFormatterArguments(args, index);
+      for (const propertyName in this.observers) {
+        if (this.observers.hasOwnProperty(propertyName)) {
+          const observer = this.observers[propertyName];
 
-        if (formatter && formatter.publish) {
-          result = formatter.publish(result, ...processedArgs);
+          let value = this.formatters.reduceRight((result: any/*check type*/, declaration: string /*check type*/, index: number) => {
+            const args = declaration.split(FORMATTER_SPLIT);
+            const id = args.shift();
+            if(!id) {
+              throw new Error('id not defined');
+            }
+            const formatter = this.view.options.formatters[id];
+            const processedArgs = this.parseFormatterArguments(args, index);
+    
+            if (formatter && formatter.publish) {
+              result = formatter.publish(result, ...processedArgs);
+            }
+            return result;
+          }, this.getValue((this.el as HTMLInputElement)));
+    
+          observer.setValue(value);
         }
-        return result;
-      }, this.getValue((this.el as HTMLInputElement)));
-
-      this.observer.setValue(value);
+      }
     }
   }
 
@@ -326,8 +351,14 @@ export class Binding {
       }
     }
 
-    if (this.observer) {
-      this.observer.unobserve();
+    if (this.observers) {
+      for (const propertyName in this.observers) {
+        if (this.observers.hasOwnProperty(propertyName)) {
+          const observer = this.observers[propertyName];
+          observer.unobserve();
+        }
+      }
+      
     }
 
     Object.keys(this.formatterObservers).forEach(fi => {
@@ -347,8 +378,15 @@ export class Binding {
    * @param {any} models 
    */
   update(models: any = {}) {
-    if (this.observer) {
-      this.model = this.observer.target;
+    if (this.observers) {
+      for (const propertyName in this.observers) {
+        if (this.observers.hasOwnProperty(propertyName)) {
+          const observer = this.observers[propertyName];
+          this.model[propertyName] = observer.target;
+          // this.model = observer.target;
+        }
+      }
+      
     }
     if(this.binder === null) {
       throw new Error('binder is null');

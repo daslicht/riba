@@ -49,8 +49,10 @@ const parseNode = (view: View, node: IDataElement) => {
   }
 
   if (!block) {
-    for (let i = 0; i < node.childNodes.length; i++) {
-      parseNode(view, (node.childNodes[i] as IDataElement));
+    if(node.childNodes) {
+      for (let i = 0; i < node.childNodes.length; i++) {
+        parseNode(view, (node.childNodes[i] as IDataElement));
+      }
     }
   }
 };
@@ -83,7 +85,7 @@ export class View {
     } else {
       this.els = ([els] as HTMLElement[] | Node[] );
     }
-
+    console.log('view options', options);
     this.models = models;
     this.options = options;
 
@@ -97,7 +99,6 @@ export class View {
     }
     let pipes = matches.map(trimStr);
     let keypath = pipes.shift() || null;
-    console.log('pipes', pipes);
     this.bindings.push(new Binding((this as View), (node as HTMLElement), type, keypath, binder, args, pipes));
   }
 

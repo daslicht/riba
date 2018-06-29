@@ -1,9 +1,4 @@
-/**
- * Used also in parsers.parseType
- * TODO outsource
- */
-const PRIMITIVE = 0;
-const KEYPATH = 1;
+import { PRIMITIVE, KEYPATH } from './attributes';
 
 const QUOTED_STR = /^'.*'$|^".*"$/; // regex to test if string is wrapped in " or '
 
@@ -23,9 +18,12 @@ export function isJson(str: string) {
 }
 
 // Parser and tokenizer for getting the type and value from a string.
-export function parseType(string: string) {
+export function parseType(string?: string) {
   let type = PRIMITIVE;
   let value: any = string;
+  if(typeof(string) === 'undefined') {
+    return {type: type, value: undefined}
+  }
   if (QUOTED_STR.test(string)) {
     value = string.slice(1, -1);
   } else if (string === 'true') {

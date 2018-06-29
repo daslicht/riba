@@ -1,6 +1,8 @@
 describe('tinybind.Binding', function() {
   var model, el, view, binding, originalPrefix, adapter, routineFn;
 
+  const DEFAULT_PROPERTYNAME = '_binder';
+
   beforeEach(function() {
     originalPrefix = tinybind.prefix;
     tinybind.prefix = 'data';
@@ -77,7 +79,7 @@ describe('tinybind.Binding', function() {
     it('subscribes to the model for changes via the adapter', function() {
       sinon.spy(adapter, 'observe');
       binding.bind();
-      adapter.observe.calledWith(model, 'name', binding).should.be.true();
+      adapter.observe.calledWith(model[DEFAULT_PROPERTYNAME], 'name', binding).should.be.true();
     });
 
     it("calls the binder's bind method if one exists", function() {
@@ -177,9 +179,9 @@ describe('tinybind.Binding', function() {
         routineFn = sinon.spy(binding, 'binder');
       }
 
-      binding.model = {foo: 'bar'};
+      binding.model[DEFAULT_PROPERTYNAME] = {foo: 'bar'};
       binding.set(function() { return this.foo; });
-      routineFn.calledWith(el, binding.model.foo).should.be.true();
+      routineFn.calledWith(el, binding.model[DEFAULT_PROPERTYNAME].foo).should.be.true();
     });
   });
   
@@ -225,7 +227,7 @@ describe('tinybind.Binding', function() {
 
       sinon.spy(adapter, 'set');
       binding.publish({target: numberInput});
-      adapter.set.calledWith(model, 'num', '42').should.be.true();
+      adapter.set.calledWith(model[DEFAULT_PROPERTYNAME], 'num', '42').should.be.true();
     });
   });
 
@@ -263,7 +265,7 @@ describe('tinybind.Binding', function() {
       numberInput.value = 42;
 
       binding.publish({target: numberInput});
-      adapter.set.calledWith(model, 'num', 'awesome 42').should.be.true();
+      adapter.set.calledWith(model[DEFAULT_PROPERTYNAME], 'num', 'awesome 42').should.be.true();
     });
 
     it("should format a value in both directions", function() {
@@ -282,7 +284,7 @@ describe('tinybind.Binding', function() {
 
       valueInput.value = 'charles';
       binding.publish({target: valueInput});
-      adapter.set.calledWith(model, 'name', 'awesome charles').should.be.true();
+      adapter.set.calledWith(model[DEFAULT_PROPERTYNAME], 'name', 'awesome charles').should.be.true();
 
       sinon.spy(binding.binder, 'routine');
       binding.set('fred');
@@ -317,7 +319,7 @@ describe('tinybind.Binding', function() {
 
       valueInput.value = 'bobby';
       binding.publish({target: valueInput});
-      adapter.set.calledWith(model, 'name', 'bobby:50:male').should.be.true();
+      adapter.set.calledWith(model[DEFAULT_PROPERTYNAME], 'name', 'bobby:50:male').should.be.true();
 
       valueInput.value.should.equal('bobby');
 
@@ -368,7 +370,7 @@ describe('tinybind.Binding', function() {
 
       valueInput.value = 'bobby';
       binding.publish({target: valueInput});
-      adapter.set.calledWith(model, 'name', '{[(BOBBY)]}').should.be.true();
+      adapter.set.calledWith(model[DEFAULT_PROPERTYNAME], 'name', '{[(BOBBY)]}').should.be.true();
 
       valueInput.value.should.equal('bobby');
 
@@ -389,7 +391,7 @@ describe('tinybind.Binding', function() {
 
       valueInput.value = 'charles';
       binding.publish({target: valueInput});
-      adapter.set.calledWith(model, 'name', 'charles').should.be.true();
+      adapter.set.calledWith(model[DEFAULT_PROPERTYNAME], 'name', 'charles').should.be.true();
 
       binding.set('fred');
       binding.binder.routine.calledWith(valueInput, 'fred').should.be.true();
@@ -419,7 +421,7 @@ describe('tinybind.Binding', function() {
 
       valueInput.value = 'fred';
       binding.publish({target: valueInput});
-      adapter.set.calledWith(model, 'name', 'fred totally is awesome').should.be.true();
+      adapter.set.calledWith(model[DEFAULT_PROPERTYNAME], 'name', 'fred totally is awesome').should.be.true();
     });
 
     it("binders in a chain should be skipped if they're not there", function() {
@@ -447,7 +449,7 @@ describe('tinybind.Binding', function() {
 
       valueInput.value = 'fred';
       binding.publish({target: valueInput});
-      adapter.set.calledWith(model, 'name', 'fred totally is radical').should.be.true();
+      adapter.set.calledWith(model[DEFAULT_PROPERTYNAME], 'name', 'fred totally is radical').should.be.true();
     });
   });
 

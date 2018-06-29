@@ -8,7 +8,7 @@ export type Scope = any;
 export interface IComponent {
   template: (() => string) | (() => HTMLElement);
   initialize: (el: HTMLElement, data: any) => Scope;
-  static?: any;
+  primitives?: any;
 
   // extension options
   binders?: IBinders<any>;

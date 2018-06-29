@@ -258,6 +258,7 @@ const binders: IBinders<any> = {
 
   // Sets the element's HTML content.
   html: <IOneWayBinder<string>> function(el: HTMLElement, value: string) {
+    console.log('html', el, value);
     el.innerHTML = value != null ? value : '';
   },
 
@@ -366,7 +367,8 @@ const binders: IBinders<any> = {
     bind(el: HTMLUnknownElement) {
       this.customData = {};
       if (!this.marker) {
-        this.marker = document.createComment(' tinybind: ' + this.type + ' ' + this.keypath + ' ');
+        const keypath = this.keypaths ? this.keypaths[0] : '';
+        this.marker = document.createComment(' tinybind: ' + this.type + ' ' + keypath + ' ');
         this.customData.attached = false;
         if(!el.parentNode) {
           throw new Error('Element has no parent node');

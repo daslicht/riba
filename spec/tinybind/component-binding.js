@@ -57,10 +57,10 @@ describe('tinybind.ComponentBinding', function() {
       .should.be.true();
     });
     
-    it('returns attributes assigned to "static" property as they are', function() {
+    it('returns attributes assigned to "primitives" property as they are', function() {
       var type = 'text';
     
-      component.static = ['type'];
+      component.primitives = ['type'];
       componentRoot.setAttribute('type', type);
       tinybind.bind(element, locals);
     
